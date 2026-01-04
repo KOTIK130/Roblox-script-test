@@ -1,21 +1,31 @@
 -- [[ Main.lua ]] --
--- Этот файл загружается первым через Loader
+-- ZlinHUB v1.0
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
+-- 5. Анимация загрузки (Простая имитация)
+-- Можно добавить звук или GUI эффект, но пока сделаем красивое уведомление
+local StarterGui = game:GetService("StarterGui")
+StarterGui:SetCore("SendNotification", {
+    Title = "ZlinHUB",
+    Text = "Loading resources...",
+    Icon = "rbxassetid://16447990029", -- Можно свою иконку
+    Duration = 3
+})
+task.wait(1)
+
 local Window = Fluent:CreateWindow({
-    Title = "KOTIK130 Hub",
-    SubTitle = "v1.0 Public Build",
+    Title = "ZlinHUB",
+    SubTitle = "by KOTIK130",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
-    Acrylic = true, 
+    Acrylic = false, -- 2. Непрозрачный фон
     Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl
+    MinimizeKey = Enum.KeyCode.RightControl -- 4. Правый Ctrl для скрытия
 })
 
--- Объект контекста для передачи данных в модули
 local Context = {
     Window = Window,
     Fluent = Fluent,
@@ -23,36 +33,41 @@ local Context = {
     InterfaceManager = InterfaceManager
 }
 
--- [[ ЗАГРУЗКА ВКЛАДОК ]] --
--- Используем глобальную функцию Import, созданную Лоадером
+-- [[ ЗАГРУЗКА МОДУЛЕЙ ]] --
 local success, err = pcall(function()
     Import("Tabs/Home.lua")(Context)
-    Import("Tabs/Farming.lua")(Context)
+    -- Import("Tabs/Farming.lua")(Context) -- Убираем, если не нужно, или оставляем для других функций
+    Import("Tabs/Movement.lua")(Context) -- 3. Новая вкладка
+    Import("Tabs/Visuals.lua")(Context)  -- 6. Новая вкладка ESP
 end)
 
 if not success then
     warn("Error importing tabs: " .. tostring(err))
     Fluent:Notify({
         Title = "Error",
-        Content = "Failed to load some tabs. Check console.",
+        Content = "Failed to load modules. Check F9 console.",
         Duration = 5
     })
 end
 
--- Выбор первой вкладки при запуске
-Window:SelectTab(1)
-
--- Уведомление об успешном запуске
-Fluent:Notify({
-    Title = "KOTIK130 Hub",
-    Content = "Script loaded successfully!",
-    Duration = 5
-})
-
--- Настройка менеджеров (сохранение конфигов)
+-- Настройка менеджеров
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({})
-InterfaceManager:BuildInterfaceSection(Window.Tabs.Settings) -- Автоматически создаст секцию настроек UI, если вкладка Settings существует
+
+-- Создаем вкладку Settings автоматически
+local SettingsTab = Window:AddTab({ Title = "Settings", Icon = "settings" })
+InterfaceManager:BuildInterfaceSection(SettingsTab)
+SaveManager:BuildConfigSection(SettingsTab)
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "ZlinHUB",
+    Content = "Successfully Loaded!",
+    SubContent = "Press Right Ctrl to toggle menu",
+    Duration = 5
+})
+
 SaveManager:LoadAutoloadConfig()
