@@ -1,16 +1,13 @@
--- [[ KOTIK130 Hub Loader ]] --
--- Этот файл лежит в корне репозитория и запускает всё остальное.
-
+-- [[ Loader.lua - Anti-Cache Version ]] --
 local User = "KOTIK130"
 local Repo = "Roblox-script-test"
 local Branch = "main"
 
--- Функция для формирования ссылок на другие файлы в этом же репо
 local function GetURL(path)
-    return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s", User, Repo, Branch, path)
+    -- Добавляем случайное число в конец, чтобы избежать кэширования
+    return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s?t=%d", User, Repo, Branch, path, os.time())
 end
 
--- Делаем эти функции доступными глобально для всех остальных модулей
 getgenv().RepoURL = GetURL
 
 getgenv().Import = function(path)
@@ -33,8 +30,7 @@ getgenv().Import = function(path)
     return func()
 end
 
--- Теперь, когда функции Import готовы, запускаем Main.lua
--- Main.lua уже будет использовать этот же Import для загрузки вкладок
+-- Запуск Main.lua с анти-кэшем
 local mainUrl = GetURL("Main.lua")
 local success, err = pcall(function()
     loadstring(game:HttpGet(mainUrl))()
