@@ -1,10 +1,9 @@
--- [[ Loader.lua - Anti-Cache Version ]] --
+-- [[ Loader.lua ]] --
 local User = "KOTIK130"
 local Repo = "Roblox-script-test"
 local Branch = "main"
 
 local function GetURL(path)
-    -- Добавляем случайное число в конец, чтобы избежать кэширования
     return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s?t=%d", User, Repo, Branch, path, os.time())
 end
 
@@ -30,12 +29,5 @@ getgenv().Import = function(path)
     return func()
 end
 
--- Запуск Main.lua с анти-кэшем
 local mainUrl = GetURL("Main.lua")
-local success, err = pcall(function()
-    loadstring(game:HttpGet(mainUrl))()
-end)
-
-if not success then
-    warn("[Loader] Critical Error loading Main.lua: " .. tostring(err))
-end
+loadstring(game:HttpGet(mainUrl))()
