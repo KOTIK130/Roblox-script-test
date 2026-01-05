@@ -1,135 +1,192 @@
 -- [[ Tabs/Visuals.lua ]] --
 return function(Context)
     local Window = Context.Window
-    local Fluent = Context.Fluent
-    local Options = Fluent.Options
-    
-    local Tab = Window:AddTab({ Title = "Visuals", Icon = "eye" })
-
-    Tab:AddSection("ESP Settings")
-
-    local ESP_Enabled = Tab:AddToggle("EspEnabled", {Title = "Enable ESP", Default = false })
-    local ESP_Boxes = Tab:AddToggle("EspBoxes", {Title = "Show Boxes", Default = true })
-    local ESP_Names = Tab:AddToggle("EspNames", {Title = "Show Names", Default = true })
-    local ESP_Tracers = Tab:AddToggle("EspTracers", {Title = "Show Tracers", Default = false })
-    
-    local ESP_Color = Tab:AddColorpicker("EspColor", {
-        Title = "ESP Color",
-        Default = Color3.fromRGB(255, 0, 0)
-    })
-
-    -- Логика ESP
+    local OrionLib = Context.OrionLib
+    local State = Context.State
     local RunService = game:GetService("RunService")
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     local Camera = workspace.CurrentCamera
-    
-    local drawings = {} -- Хранилище объектов отрисовки
 
-    -- Функция очистки ESP для игрока
-    local function removeEsp(player)
-        if drawings[player] then
-            for _, drawing in pairs(drawings[player]) do
-                drawing:Remove()
-            end
-            drawings[player] = nil
-        end
+    local Tab = Window:MakeTab({
+        Name = "Visuals",
+        Icon = "rbxassetid://4483345998",
+        PremiumOnly = false
+    })
+
+    local EspConfig = {
+        Enabled = false,
+        Boxes = true,
+        Names = true,
+        Tracers = false,
+        Color = Color3.fromRGB(255, 60, 60),
+        TextSize = 13
+    }
+
+    Tab:AddToggle({
+        Name = "Enable ESP",
+        Default = false,
+        Callback = function(Value)
+            EspConfig.Enabled = Value
+        end    
+    })
+
+    Tab:AddToggle({
+        Name = "Show Boxes",
+        Default = true,
+        Callback = function(Value) EspConfig.Boxes = Value end    
+    })
+    
+    Tab:AddToggle({
+        Name = "Show Names",
+        Default = true,
+        Callback = function(Value) EspConfig.Names = Value end    
+    })
+    
+    Tab:AddToggle({
+        Name = "Show Tracers",
+        Default = false,
+        Callback = function(Value) EspConfig.Tracers = Value end    
+    })
+
+    Tab:AddColorpicker({
+        Name = "ESP Color",
+        Default = Color3.fromRGB(255, 60, 60),
+        Callback = function(Value)
+            EspConfig.Color = Value
+        end    
+    })
+
+    -- Логика отрисовки
+    local function CreateDrawing(type)
+        local obj = Drawing.new(type)
+        obj.Visible = false
+        return obj
     end
 
-    -- Функция создания ESP для игрока
-    local function createEsp(player)
+    local function AddEsp(player)
         if player == LocalPlayer then return end
         
         local objects = {
-            Box = Drawing.new("Square"),
-            Name = Drawing.new("Text"),
-            Tracer = Drawing.new("Line")
+            BoxOutline = CreateDrawing("Square"),
+            Box = CreateDrawing("Square"),
+            Name = CreateDrawing("Text"),
+            Tracer = CreateDrawing("Line")
         }
         
-        -- Настройка начальных свойств
-        objects.Box.Visible = false
-        objects.Box.Color = Options.EspColor.Value
+        -- Настройка стилей
+        objects.BoxOutline.Color = Color3.new(0,0,0) -- Черная обводка для контраста
+        objects.BoxOutline.Thickness = 3
+        objects.BoxOutline.Filled = false
+        
         objects.Box.Thickness = 1
         objects.Box.Filled = false
         
-        objects.Name.Visible = false
-        objects.Name.Color = Options.EspColor.Value
-        objects.Name.Size = 14
         objects.Name.Center = true
         objects.Name.Outline = true
+        objects.Name.OutlineColor = Color3.new(0,0,0)
+        objects.Name.Font = 2 -- 0=UI, 1=System, 2=Plex, 3=Monospace (Plex выглядит аккуратно)
+        objects.Name.Size = EspConfig.TextSize
         
-        objects.Tracer.Visible = false
-        objects.Tracer.Color = Options.EspColor.Value
         objects.Tracer.Thickness = 1
         
-        drawings[player] = objects
+        State.DrawingObjects[player] = objects
     end
 
-    -- Обновление ESP каждый кадр
-    RunService.RenderStepped:Connect(function()
-        if not Options.EspEnabled.Value then
-            for _, playerDrawings in pairs(drawings) do
-                for _, drawing in pairs(playerDrawings) do
-                    drawing.Visible = false
-                end
+    local function RemoveEsp(player)
+        if State.DrawingObjects[player] then
+            for _, obj in pairs(State.DrawingObjects[player]) do
+                obj:Remove()
+            end
+            State.DrawingObjects[player] = nil
+        end
+    end
+
+    -- Обновление
+    local espLoop = RunService.RenderStepped:Connect(function()
+        if not EspConfig.Enabled then
+            for _, pData in pairs(State.DrawingObjects) do
+                for _, obj in pairs(pData) do obj.Visible = false end
             end
             return
         end
 
         for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-                if not drawings[player] then createEsp(player) end
+            if player ~= LocalPlayer then
+                if not State.DrawingObjects[player] then
+                    AddEsp(player)
+                end
                 
                 local char = player.Character
-                local root = char.HumanoidRootPart
-                local vector, onScreen = Camera:WorldToViewportPoint(root.Position)
+                local objs = State.DrawingObjects[player]
                 
-                local objs = drawings[player]
-                local color = Options.EspColor.Value
-
-                if onScreen then
-                    -- Box
-                    if Options.EspBoxes.Value then
-                        local size = Vector2.new(2000 / vector.Z, 2500 / vector.Z) -- Размер зависит от дистанции
-                        local pos = Vector2.new(vector.X - size.X / 2, vector.Y - size.Y / 2)
+                if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+                    local root = char.HumanoidRootPart
+                    local head = char:FindFirstChild("Head")
+                    local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                    
+                    if onScreen then
+                        local color = EspConfig.Color
                         
-                        objs.Box.Size = size
-                        objs.Box.Position = pos
-                        objs.Box.Color = color
-                        objs.Box.Visible = true
+                        -- Расчет размеров бокса
+                        local rootPos = root.Position
+                        local headPos = head and head.Position or (rootPos + Vector3.new(0,2,0))
+                        local legPos = rootPos - Vector3.new(0,3,0)
+                        
+                        local top, _ = Camera:WorldToViewportPoint(headPos + Vector3.new(0, 0.5, 0))
+                        local bottom, _ = Camera:WorldToViewportPoint(legPos)
+                        
+                        local height = math.abs(top.Y - bottom.Y)
+                        local width = height / 1.6 -- Стандартное соотношение
+                        
+                        -- BOX
+                        if EspConfig.Boxes then
+                            local boxPos = Vector2.new(pos.X - width/2, pos.Y - height/2)
+                            
+                            -- Черная обводка
+                            objs.BoxOutline.Size = Vector2.new(width, height)
+                            objs.BoxOutline.Position = boxPos
+                            objs.BoxOutline.Visible = true
+                            
+                            -- Цветной бокс
+                            objs.Box.Size = Vector2.new(width, height)
+                            objs.Box.Position = boxPos
+                            objs.Box.Color = color
+                            objs.Box.Visible = true
+                        else
+                            objs.BoxOutline.Visible = false
+                            objs.Box.Visible = false
+                        end
+                        
+                        -- NAME
+                        if EspConfig.Names then
+                            objs.Name.Text = player.Name .. " [" .. math.floor(char.Humanoid.Health) .. " HP]"
+                            objs.Name.Position = Vector2.new(pos.X, pos.Y - height/2 - 15)
+                            objs.Name.Color = color
+                            objs.Name.Visible = true
+                        else
+                            objs.Name.Visible = false
+                        end
+                        
+                        -- TRACER
+                        if EspConfig.Tracers then
+                            objs.Tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                            objs.Tracer.To = Vector2.new(pos.X, pos.Y + height/2) -- К ногам
+                            objs.Tracer.Color = color
+                            objs.Tracer.Visible = true
+                        else
+                            objs.Tracer.Visible = false
+                        end
                     else
-                        objs.Box.Visible = false
-                    end
-
-                    -- Name
-                    if Options.EspNames.Value then
-                        objs.Name.Text = player.Name
-                        objs.Name.Position = Vector2.new(vector.X, vector.Y - (2500 / vector.Z) / 2 - 15)
-                        objs.Name.Color = color
-                        objs.Name.Visible = true
-                    else
-                        objs.Name.Visible = false
-                    end
-
-                    -- Tracer
-                    if Options.EspTracers.Value then
-                        objs.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y) -- От низа центра экрана
-                        objs.Tracer.To = Vector2.new(vector.X, vector.Y)
-                        objs.Tracer.Color = color
-                        objs.Tracer.Visible = true
-                    else
-                        objs.Tracer.Visible = false
+                         for _, obj in pairs(objs) do obj.Visible = false end
                     end
                 else
-                    objs.Box.Visible = false
-                    objs.Name.Visible = false
-                    objs.Tracer.Visible = false
+                    for _, obj in pairs(objs) do obj.Visible = false end
                 end
-            else
-                removeEsp(player)
             end
         end
     end)
-
-    Players.PlayerRemoving:Connect(removeEsp)
+    table.insert(State.Connections, espLoop)
+    
+    Players.PlayerRemoving:Connect(RemoveEsp)
 end
