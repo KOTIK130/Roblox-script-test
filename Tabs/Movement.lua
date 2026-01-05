@@ -1,164 +1,125 @@
 -- [[ Tabs/Movement.lua ]] --
 return function(Context)
     local Window = Context.Window
-    local OrionLib = Context.OrionLib
+    local Rayfield = Context.Rayfield
     local State = Context.State
     local RunService = game:GetService("RunService")
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
 
-    local Tab = Window:MakeTab({
-        Name = "Movement",
-        Icon = "rbxassetid://4483345998",
-        PremiumOnly = false
-    })
+    local Tab = Window:CreateTab("Movement", 4483362458) -- Иконка бега
 
-    -- WalkSpeed
-    Tab:AddSlider({
+    Tab:CreateSection("Character Stats")
+
+    Tab:CreateSlider({
         Name = "Walk Speed",
-        Min = 16,
-        Max = 250,
-        Default = 16,
-        Color = Color3.fromRGB(255, 255, 255),
+        Range = {16, 300},
         Increment = 1,
-        ValueName = "Speed",
+        Suffix = "Speed",
+        CurrentValue = 16,
+        Flag = "WalkSpeed", 
         Callback = function(Value)
             State.WalkSpeed = Value
             if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
                 LocalPlayer.Character.Humanoid.WalkSpeed = Value
             end
-        end    
+        end,
     })
-    
-    -- JumpPower
-    Tab:AddSlider({
+
+    Tab:CreateSlider({
         Name = "Jump Power",
-        Min = 50,
-        Max = 350,
-        Default = 50,
-        Color = Color3.fromRGB(255, 255, 255),
+        Range = {50, 500},
         Increment = 1,
-        ValueName = "Power",
+        Suffix = "Power",
+        CurrentValue = 50,
+        Flag = "JumpPower", 
         Callback = function(Value)
             State.JumpPower = Value
             if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
                 LocalPlayer.Character.Humanoid.UseJumpPower = true
                 LocalPlayer.Character.Humanoid.JumpPower = Value
             end
-        end    
+        end,
     })
-    
-    -- Infinite Jump
-    Tab:AddToggle({
+
+    Tab:CreateSection("Abilities")
+
+    Tab:CreateToggle({
         Name = "Infinite Jump",
-        Default = false,
+        CurrentValue = false,
+        Flag = "InfJump", 
         Callback = function(Value)
             State.InfJumpEnabled = Value
-        end    
+        end,
     })
-    
-    -- Коннект для InfJump
-    local jumpConn = game:GetService("UserInputService").JumpRequest:Connect(function()
+
+    -- Логика InfJump
+    game:GetService("UserInputService").JumpRequest:Connect(function()
         if State.InfJumpEnabled then
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("Humanoid") then
-                char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
         end
     end)
-    table.insert(State.Connections, jumpConn)
-    
-    -- Поддержание скорости при респавне
-    local respawnConn = LocalPlayer.CharacterAdded:Connect(function(char)
-        char:WaitForChild("Humanoid")
-        task.wait(0.5)
-        char.Humanoid.WalkSpeed = State.WalkSpeed
-        char.Humanoid.JumpPower = State.JumpPower
-        char.Humanoid.UseJumpPower = true
-    end)
-    table.insert(State.Connections, respawnConn)
 
-
-    -- 2. Улучшенный Fly (WASD only, camera direction)
+    -- Fly
     local FlySpeed = 50
-    
-    Tab:AddSlider({
+    Tab:CreateSlider({
         Name = "Fly Speed",
-        Min = 10,
-        Max = 200,
-        Default = 50,
-        Color = Color3.fromRGB(0, 255, 255),
+        Range = {10, 300},
         Increment = 1,
-        ValueName = "Speed",
+        Suffix = "Speed",
+        CurrentValue = 50,
+        Flag = "FlySpeed", 
         Callback = function(Value)
             FlySpeed = Value
-        end    
+        end,
     })
 
-    Tab:AddToggle({
-        Name = "Enable Fly",
-        Default = false,
+    Tab:CreateToggle({
+        Name = "Enable Fly (WASD)",
+        CurrentValue = false,
+        Flag = "FlyEnabled", 
         Callback = function(Value)
             State.FlyEnabled = Value
-            
             local char = LocalPlayer.Character
             if not char then return end
             local root = char:FindFirstChild("HumanoidRootPart")
-            if not root then return end
-
-            if Value then
+            
+            if Value and root then
                 local bv = Instance.new("BodyVelocity", root)
-                bv.Name = "ZlinFlyVelocity"
-                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                bv.Velocity = Vector3.new(0, 0, 0)
+                bv.Name = "ZlinFlyV"
+                bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
                 
                 local bg = Instance.new("BodyGyro", root)
-                bg.Name = "ZlinFlyGyro"
-                bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                bg.Name = "ZlinFlyG"
+                bg.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
                 bg.P = 10000
                 bg.D = 1000
                 
-                -- Логика полета в цикле
-                local flyLoop; flyLoop = RunService.RenderStepped:Connect(function()
-                    if not State.FlyEnabled or not char:FindFirstChild("Humanoid") or char.Humanoid.Health <= 0 then
-                        if bv then bv:Destroy() end
-                        if bg then bg:Destroy() end
-                        flyLoop:Disconnect()
-                        return
+                task.spawn(function()
+                    while State.FlyEnabled and char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 do
+                        local cam = workspace.CurrentCamera
+                        local moveDir = Vector3.new()
+                        local uis = game:GetService("UserInputService")
+                        
+                        if uis:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+                        if uis:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+                        if uis:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+                        if uis:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+                        
+                        bg.CFrame = cam.CFrame
+                        bv.Velocity = moveDir * FlySpeed
+                        task.wait()
                     end
-                    
-                    local cam = workspace.CurrentCamera
-                    local moveDir = Vector3.new(0, 0, 0)
-                    local uis = game:GetService("UserInputService")
-                    
-                    -- Вектора направления камеры (без Y для движения по плоскости, но мы хотим летать за камерой)
-                    local look = cam.CFrame.LookVector
-                    local right = cam.CFrame.RightVector
-                    
-                    if uis:IsKeyDown(Enum.KeyCode.W) then
-                        moveDir = moveDir + look
-                    end
-                    if uis:IsKeyDown(Enum.KeyCode.S) then
-                        moveDir = moveDir - look
-                    end
-                    if uis:IsKeyDown(Enum.KeyCode.D) then
-                        moveDir = moveDir + right
-                    end
-                    if uis:IsKeyDown(Enum.KeyCode.A) then
-                        moveDir = moveDir - right
-                    end
-                    
-                    -- Игнорируем Shift/Space для вертикали, летим только туда, куда смотрим + WASD
-                    
-                    bg.CFrame = cam.CFrame
-                    bv.Velocity = moveDir * FlySpeed
+                    if bv then bv:Destroy() end
+                    if bg then bg:Destroy() end
                 end)
             else
-                local bv = root:FindFirstChild("ZlinFlyVelocity")
-                local bg = root:FindFirstChild("ZlinFlyGyro")
-                if bv then bv:Destroy() end
-                if bg then bg:Destroy() end
+                for _, v in pairs(root:GetChildren()) do
+                    if v.Name == "ZlinFlyV" or v.Name == "ZlinFlyG" then v:Destroy() end
+                end
             end
-        end    
+        end,
     })
 end
