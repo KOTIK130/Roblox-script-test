@@ -1,109 +1,91 @@
--- [[ Main.lua - ZlinHUB v2.0 Orion ]] --
+-- [[ Main.lua - ZlinHUB v2.1 DEBUG ]] --
 
--- Загрузка Orion UI
-local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+local function SafeLoad(url, name)
+    print("Loading " .. name .. "...")
+    local success, content = pcall(function() return game:HttpGet(url) end)
+    if not success then
+        warn("Failed to download " .. name .. ": " .. tostring(content))
+        return nil
+    end
+    local func, err = loadstring(content)
+    if not func then
+        warn("Syntax error in " .. name .. ": " .. tostring(err))
+        return nil
+    end
+    return func()
+end
+
+-- Пробуем загрузить Orion (зеркало)
+local OrionUrl = 'https://raw.githubusercontent.com/jhelap/Orion/main/source'
+local OrionLib = SafeLoad(OrionUrl, "OrionLib")
+
+if not OrionLib then
+    warn("CRITICAL: Orion Library failed to load. Aborting.")
+    return
+end
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- 6. Приветствие и Анимация
--- Orion имеет встроенную систему уведомлений, но мы сделаем кастомное приветствие в консоль или уведомлением
 OrionLib:MakeNotification({
     Name = "ZlinHUB",
-    Content = "Здравствуйте, Господин " .. LocalPlayer.Name .. "!",
+    Content = "Welcome back, " .. LocalPlayer.Name,
     Image = "rbxassetid://4483345998",
     Time = 5
 })
 
--- Создание окна
 local Window = OrionLib:MakeWindow({
     Name = "ZlinHUB",
     HidePremium = false,
     SaveConfig = true,
     ConfigFolder = "ZlinHUB_Config",
-    IntroEnabled = true, -- Анимация интро Orion
-    IntroText = "Welcome, " .. LocalPlayer.Name
+    IntroEnabled = true,
+    IntroText = "ZlinHUB Loading..."
 })
 
--- Глобальная таблица для хранения состояния (чтобы можно было всё выключить при закрытии)
+-- State
 getgenv().ZlinState = {
-    Connections = {}, -- Для коннектов (RunService и т.д.)
-    DrawingObjects = {}, -- Для ESP
+    Connections = {},
+    DrawingObjects = {},
     FlyEnabled = false,
     InfJumpEnabled = false,
     WalkSpeed = 16,
     JumpPower = 50,
-    OriginalSettings = { -- Сохраняем оригинальные настройки, чтобы вернуть их
-        WalkSpeed = 16,
-        JumpPower = 50
-    }
+    OriginalSettings = { WalkSpeed = 16, JumpPower = 50 }
 }
 
--- Функция полного сброса (Cleanup)
-local function Cleanup()
-    print("ZlinHUB: Cleaning up...")
-    
-    -- Отключаем Fly
-    getgenv().ZlinState.FlyEnabled = false
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("HumanoidRootPart") then
-        local bv = char.HumanoidRootPart:FindFirstChild("ZlinFlyVelocity")
-        local bg = char.HumanoidRootPart:FindFirstChild("ZlinFlyGyro")
-        if bv then bv:Destroy() end
-        if bg then bg:Destroy() end
-    end
-    
-    -- Сбрасываем скорость и прыжок
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.WalkSpeed = getgenv().ZlinState.OriginalSettings.WalkSpeed
-        char.Humanoid.JumpPower = getgenv().ZlinState.OriginalSettings.JumpPower
-    end
-    
-    -- Очищаем ESP
-    for _, playerObjects in pairs(getgenv().ZlinState.DrawingObjects) do
-        for _, obj in pairs(playerObjects) do
-            obj:Remove()
-        end
-    end
-    getgenv().ZlinState.DrawingObjects = {}
-    
-    -- Разрываем все соединения
-    for _, conn in pairs(getgenv().ZlinState.Connections) do
-        if conn then conn:Disconnect() end
-    end
-    getgenv().ZlinState.Connections = {}
-    
-    print("ZlinHUB: Cleanup complete.")
-end
-
--- Хук на закрытие скрипта (Orion позволяет деструктор при уничтожении GUI, но лучше добавить кнопку Unload)
-Window:GetTab("Settings"):AddButton({
-    Name = "Unload Script & Reset",
-    Callback = function()
-        Cleanup()
-        OrionLib:Destroy()
-    end
-})
-
-
+-- Context
 local Context = {
     Window = Window,
     OrionLib = OrionLib,
     State = getgenv().ZlinState
 }
 
--- Загрузка модулей
-local success, err = pcall(function()
-    Import("Tabs/Movement.lua")(Context)
-    Import("Tabs/Visuals.lua")(Context)
-    Import("Tabs/Players.lua")(Context) -- Новая вкладка для TP и Anti-Lag
-end)
+-- Импорт вкладок с проверкой
+local tabs = {
+    "Tabs/Movement.lua",
+    "Tabs/Visuals.lua",
+    "Tabs/Players.lua"
+}
 
-if not success then
-    OrionLib:MakeNotification({
-        Name = "Error",
-        Content = "Failed to load tabs: " .. tostring(err),
-        Time = 5
-    })
+for _, path in ipairs(tabs) do
+    if getgenv().Import then
+        local success, result = pcall(function()
+            local tabFunc = Import(path) -- Функция импорта из Лоадера
+            if tabFunc then
+                tabFunc(Context)
+            else
+                warn("Import returned nil for: " .. path)
+            end
+        end)
+        if not success then
+            warn("Failed to execute tab: " .. path .. " | Error: " .. tostring(result))
+        else
+            print("Successfully loaded tab: " .. path)
+        end
+    else
+        warn("Global function 'Import' not found! Are you running via Loader?")
+    end
 end
 
 OrionLib:Init()
