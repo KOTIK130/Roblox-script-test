@@ -1,91 +1,66 @@
--- [[ Main.lua - ZlinHUB v2.1 DEBUG ]] --
+-- [[ Main.lua - ZlinHUB v3.0 Rayfield Fix ]] --
 
-local function SafeLoad(url, name)
-    print("Loading " .. name .. "...")
+-- Функция безопасной загрузки
+local function SecureLoad(url)
     local success, content = pcall(function() return game:HttpGet(url) end)
-    if not success then
-        warn("Failed to download " .. name .. ": " .. tostring(content))
-        return nil
-    end
+    if not success or not content then return nil, "HTTP Error" end
     local func, err = loadstring(content)
-    if not func then
-        warn("Syntax error in " .. name .. ": " .. tostring(err))
-        return nil
-    end
-    return func()
+    if not func then return nil, err end
+    return func
 end
 
--- Пробуем загрузить Orion (зеркало)
-local OrionUrl = 'https://raw.githubusercontent.com/jhelap/Orion/main/source'
-local OrionLib = SafeLoad(OrionUrl, "OrionLib")
+-- Попытка загрузить Rayfield Interface Suite
+local Rayfield = SecureLoad('https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua')()
 
-if not OrionLib then
-    warn("CRITICAL: Orion Library failed to load. Aborting.")
+-- Если и это не загрузилось, попробуем зеркало (на случай блокировки)
+if not Rayfield then
+   warn("Main repo blocked. Trying mirror...")
+   Rayfield = SecureLoad('https://raw.githubusercontent.com/shlexware/Rayfield/main/source')()
+end
+
+if not Rayfield then
+    warn("CRITICAL ERROR: Failed to load UI Library.")
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "ZlinHUB Error";
+        Text = "UI Library blocked. Check connection.";
+        Duration = 5;
+    })
     return
 end
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
-OrionLib:MakeNotification({
+local Window = Rayfield:CreateWindow({
     Name = "ZlinHUB",
-    Content = "Welcome back, " .. LocalPlayer.Name,
-    Image = "rbxassetid://4483345998",
-    Time = 5
+    LoadingTitle = "ZlinHUB Interface",
+    LoadingSubtitle = "by KOTIK130",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "ZlinHUB_Config",
+        FileName = "Manager"
+    },
+    KeySystem = false, -- Можно включить, если нужно
 })
 
-local Window = OrionLib:MakeWindow({
-    Name = "ZlinHUB",
-    HidePremium = false,
-    SaveConfig = true,
-    ConfigFolder = "ZlinHUB_Config",
-    IntroEnabled = true,
-    IntroText = "ZlinHUB Loading..."
-})
-
--- State
-getgenv().ZlinState = {
-    Connections = {},
-    DrawingObjects = {},
-    FlyEnabled = false,
-    InfJumpEnabled = false,
-    WalkSpeed = 16,
-    JumpPower = 50,
-    OriginalSettings = { WalkSpeed = 16, JumpPower = 50 }
-}
-
--- Context
 local Context = {
     Window = Window,
-    OrionLib = OrionLib,
-    State = getgenv().ZlinState
+    Rayfield = Rayfield, -- Передаем Rayfield вместо Fluent/Orion
+    State = {
+        Connections = {},
+        DrawingObjects = {},
+    }
 }
 
--- Импорт вкладок с проверкой
-local tabs = {
-    "Tabs/Movement.lua",
-    "Tabs/Visuals.lua",
-    "Tabs/Players.lua"
-}
+-- [[ ВНИМАНИЕ ]]
+-- Тебе нужно будет обновить Tabs/Movement.lua, Tabs/Visuals.lua и т.д., 
+-- так как синтаксис Rayfield отличается от Orion и Fluent.
+-- Если загрузятся старые табы с Orion кодом — будет ошибка.
+-- ПОКА ДАВАЙ ПРОВЕРИМ, ОТКРОЕТСЯ ЛИ МЕНЮ БЕЗ ВКЛАДОК.
 
-for _, path in ipairs(tabs) do
-    if getgenv().Import then
-        local success, result = pcall(function()
-            local tabFunc = Import(path) -- Функция импорта из Лоадера
-            if tabFunc then
-                tabFunc(Context)
-            else
-                warn("Import returned nil for: " .. path)
-            end
-        end)
-        if not success then
-            warn("Failed to execute tab: " .. path .. " | Error: " .. tostring(result))
-        else
-            print("Successfully loaded tab: " .. path)
-        end
-    else
-        warn("Global function 'Import' not found! Are you running via Loader?")
-    end
-end
+-- Import("Tabs/Movement.lua")(Context) -- ЗАКОММЕНТИРУЙ ЭТИ СТРОКИ ДЛЯ ТЕСТА!
+-- Import("Tabs/Visuals.lua")(Context)
 
-OrionLib:Init()
+Rayfield:Notify({
+    Title = "Welcome",
+    Content = "UI Library Loaded Successfully!",
+    Duration = 6.5,
+    Image = 4483345998,
+})
