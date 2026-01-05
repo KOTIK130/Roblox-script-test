@@ -1,73 +1,109 @@
--- [[ Main.lua ]] --
--- ZlinHUB v1.0
+-- [[ Main.lua - ZlinHUB v2.0 Orion ]] --
 
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+-- Загрузка Orion UI
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
--- 5. Анимация загрузки (Простая имитация)
--- Можно добавить звук или GUI эффект, но пока сделаем красивое уведомление
-local StarterGui = game:GetService("StarterGui")
-StarterGui:SetCore("SendNotification", {
-    Title = "ZlinHUB",
-    Text = "Loading resources...",
-    Icon = "rbxassetid://16447990029", -- Можно свою иконку
-    Duration = 3
+-- 6. Приветствие и Анимация
+-- Orion имеет встроенную систему уведомлений, но мы сделаем кастомное приветствие в консоль или уведомлением
+OrionLib:MakeNotification({
+    Name = "ZlinHUB",
+    Content = "Здравствуйте, Господин " .. LocalPlayer.Name .. "!",
+    Image = "rbxassetid://4483345998",
+    Time = 5
 })
-task.wait(1)
 
-local Window = Fluent:CreateWindow({
-    Title = "ZlinHUB",
-    SubTitle = "by KOTIK130",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
-    Acrylic = false, -- 2. Непрозрачный фон
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.RightControl -- 4. Правый Ctrl для скрытия
+-- Создание окна
+local Window = OrionLib:MakeWindow({
+    Name = "ZlinHUB",
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "ZlinHUB_Config",
+    IntroEnabled = true, -- Анимация интро Orion
+    IntroText = "Welcome, " .. LocalPlayer.Name
 })
+
+-- Глобальная таблица для хранения состояния (чтобы можно было всё выключить при закрытии)
+getgenv().ZlinState = {
+    Connections = {}, -- Для коннектов (RunService и т.д.)
+    DrawingObjects = {}, -- Для ESP
+    FlyEnabled = false,
+    InfJumpEnabled = false,
+    WalkSpeed = 16,
+    JumpPower = 50,
+    OriginalSettings = { -- Сохраняем оригинальные настройки, чтобы вернуть их
+        WalkSpeed = 16,
+        JumpPower = 50
+    }
+}
+
+-- Функция полного сброса (Cleanup)
+local function Cleanup()
+    print("ZlinHUB: Cleaning up...")
+    
+    -- Отключаем Fly
+    getgenv().ZlinState.FlyEnabled = false
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local bv = char.HumanoidRootPart:FindFirstChild("ZlinFlyVelocity")
+        local bg = char.HumanoidRootPart:FindFirstChild("ZlinFlyGyro")
+        if bv then bv:Destroy() end
+        if bg then bg:Destroy() end
+    end
+    
+    -- Сбрасываем скорость и прыжок
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = getgenv().ZlinState.OriginalSettings.WalkSpeed
+        char.Humanoid.JumpPower = getgenv().ZlinState.OriginalSettings.JumpPower
+    end
+    
+    -- Очищаем ESP
+    for _, playerObjects in pairs(getgenv().ZlinState.DrawingObjects) do
+        for _, obj in pairs(playerObjects) do
+            obj:Remove()
+        end
+    end
+    getgenv().ZlinState.DrawingObjects = {}
+    
+    -- Разрываем все соединения
+    for _, conn in pairs(getgenv().ZlinState.Connections) do
+        if conn then conn:Disconnect() end
+    end
+    getgenv().ZlinState.Connections = {}
+    
+    print("ZlinHUB: Cleanup complete.")
+end
+
+-- Хук на закрытие скрипта (Orion позволяет деструктор при уничтожении GUI, но лучше добавить кнопку Unload)
+Window:GetTab("Settings"):AddButton({
+    Name = "Unload Script & Reset",
+    Callback = function()
+        Cleanup()
+        OrionLib:Destroy()
+    end
+})
+
 
 local Context = {
     Window = Window,
-    Fluent = Fluent,
-    SaveManager = SaveManager,
-    InterfaceManager = InterfaceManager
+    OrionLib = OrionLib,
+    State = getgenv().ZlinState
 }
 
--- [[ ЗАГРУЗКА МОДУЛЕЙ ]] --
+-- Загрузка модулей
 local success, err = pcall(function()
-    Import("Tabs/Home.lua")(Context)
-    -- Import("Tabs/Farming.lua")(Context) -- Убираем, если не нужно, или оставляем для других функций
-    Import("Tabs/Movement.lua")(Context) -- 3. Новая вкладка
-    Import("Tabs/Visuals.lua")(Context)  -- 6. Новая вкладка ESP
+    Import("Tabs/Movement.lua")(Context)
+    Import("Tabs/Visuals.lua")(Context)
+    Import("Tabs/Players.lua")(Context) -- Новая вкладка для TP и Anti-Lag
 end)
 
 if not success then
-    warn("Error importing tabs: " .. tostring(err))
-    Fluent:Notify({
-        Title = "Error",
-        Content = "Failed to load modules. Check F9 console.",
-        Duration = 5
+    OrionLib:MakeNotification({
+        Name = "Error",
+        Content = "Failed to load tabs: " .. tostring(err),
+        Time = 5
     })
 end
 
--- Настройка менеджеров
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({})
-
--- Создаем вкладку Settings автоматически
-local SettingsTab = Window:AddTab({ Title = "Settings", Icon = "settings" })
-InterfaceManager:BuildInterfaceSection(SettingsTab)
-SaveManager:BuildConfigSection(SettingsTab)
-
-Window:SelectTab(1)
-
-Fluent:Notify({
-    Title = "ZlinHUB",
-    Content = "Successfully Loaded!",
-    SubContent = "Press Right Ctrl to toggle menu",
-    Duration = 5
-})
-
-SaveManager:LoadAutoloadConfig()
+OrionLib:Init()
