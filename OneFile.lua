@@ -1,4 +1,4 @@
--- [[ ZlinHUB v6.0 - Custom Cosmic UI ]] --
+-- [[ ZlinHUB v7.0 - Neon Fix ]] --
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -12,7 +12,6 @@ if CoreGui:FindFirstChild("CustomScriptUI") then
     CoreGui.CustomScriptUI:Destroy()
 end
 
--- 2. СОЗДАНИЕ БАЗОВОГО ИНТЕРФЕЙСА (Твой код + Логика)
 local function create(inst, props, parent)
 	local obj = Instance.new(inst)
 	for k, v in pairs(props or {}) do
@@ -25,295 +24,181 @@ end
 local gui = create("ScreenGui", {
 	Name = "CustomScriptUI",
 	ResetOnSpawn = false,
-	ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-}, CoreGui) -- Важно: CoreGui для скрытности
+	ZIndexBehavior = Enum.ZIndexBehavior.Global -- ВАЖНО: Global ZIndex для правильного наложения
+}, CoreGui)
 
--- Root (square)
+-- Root (Main Frame)
 local root = create("Frame", {
 	Name = "Root",
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.52),
-	Size = UDim2.fromOffset(520, 520),
-	BackgroundColor3 = Color3.fromRGB(18, 18, 24),
-	BackgroundTransparency = 0.06,
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(550, 400),
+	BackgroundColor3 = Color3.fromRGB(10, 10, 15), -- Почти черный фон
 	BorderSizePixel = 0,
     Active = true,
-    Draggable = true
+    Draggable = true,
+    ZIndex = 1
 }, gui)
 
-create("UICorner", {CornerRadius = UDim.new(0, 28)}, root)
+create("UICorner", {CornerRadius = UDim.new(0, 15)}, root)
 
--- Fancy border via Stroke + Gradient
+-- NEON BORDER (Яркая обводка)
 local stroke = create("UIStroke", {
-	Thickness = 3,
-	Transparency = 0.05,
+	Thickness = 4,
+	Transparency = 0,
+    Color = Color3.fromRGB(255, 255, 255), -- Белый, чтобы градиент был ярким
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	LineJoinMode = Enum.LineJoinMode.Round
-}, root)
+    Parent = root
+})
 
 local strokeGrad = create("UIGradient", {
-	Rotation = 35,
+	Rotation = 0,
 	Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(60, 255, 200)),
-		ColorSequenceKeypoint.new(0.33, Color3.fromRGB(90, 140, 255)),
-		ColorSequenceKeypoint.new(0.66, Color3.fromRGB(220, 90, 255)),
-		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 200, 80)),
-	})
-}, stroke)
+		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
+		ColorSequenceKeypoint.new(0.20, Color3.fromRGB(255, 255, 0)),
+		ColorSequenceKeypoint.new(0.40, Color3.fromRGB(0, 255, 0)),
+		ColorSequenceKeypoint.new(0.60, Color3.fromRGB(0, 255, 255)),
+		ColorSequenceKeypoint.new(0.80, Color3.fromRGB(0, 0, 255)),
+		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 255)),
+	}),
+    Parent = stroke
+})
 
--- Анимация градиента рамки
+-- Анимация радуги
 task.spawn(function()
     while root.Parent do
-        strokeGrad.Rotation = strokeGrad.Rotation + 1
-        task.wait(0.05)
+        strokeGrad.Rotation = (strokeGrad.Rotation + 2) % 360
+        task.wait(0.02)
     end
 end)
 
--- Inner inset panel
-local inset = create("Frame", {
-	Name = "Inset",
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.52),
-	Size = UDim2.fromScale(0.93, 0.90),
-	BackgroundColor3 = Color3.fromRGB(10, 10, 14),
-	BackgroundTransparency = 0.15,
-	BorderSizePixel = 0
-}, root)
-create("UICorner", {CornerRadius = UDim.new(0, 22)}, inset)
-
--- Subtle “glass” overlay
-local glass = create("Frame", {
-	Name = "Glass",
-	Size = UDim2.fromScale(1, 1),
-	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-	BackgroundTransparency = 0.92,
-	BorderSizePixel = 0
-}, inset)
-create("UICorner", {CornerRadius = UDim.new(0, 22)}, glass)
-
--- Big soft highlights
-local highlight = create("Frame", {
-	Name = "Highlight",
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.55, 0.35),
-	Size = UDim2.fromScale(1.2, 1.0),
-	BackgroundColor3 = Color3.fromRGB(90, 140, 255),
-	BackgroundTransparency = 0.86,
-	BorderSizePixel = 0
-}, inset)
-create("UICorner", {CornerRadius = UDim.new(1, 0)}, highlight)
-create("UIGradient", {
-	Rotation = -25,
-	Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 140, 255)),
-		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(220, 90, 255)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 255, 200)),
-	}),
-	Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.35),
-		NumberSequenceKeypoint.new(1, 1.0),
-	})
-}, highlight)
-
--- Patterns: corner swirls
-local function cornerSwirl(parent, side)
-	local holder = create("Frame", {
-		Name = "Swirl_"..side,
-		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(170, 170),
-		ZIndex = 5
-	}, parent)
-
-	if side == "BL" then
-		holder.Position = UDim2.new(0, 10, 1, -180)
-	elseif side == "BR" then
-		holder.Position = UDim2.new(1, -180, 1, -180)
-	end
-
-	for i = 1, 5 do
-		local ring = create("Frame", {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(170 - i*22, 170 - i*22),
-			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-			BackgroundTransparency = 0.94,
-			BorderSizePixel = 0
-		}, holder)
-		create("UICorner", {CornerRadius = UDim.new(1, 0)}, ring)
-
-		local s = create("UIStroke", {
-			Thickness = 2,
-			Transparency = 0.25 + i*0.08,
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-		}, ring)
-
-		create("UIGradient", {
-			Rotation = (side == "BL") and (20 + i*14) or (200 + i*14),
-			Color = ColorSequence.new({
-				ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 255, 200)),
-				ColorSequenceKeypoint.new(0.5, Color3.fromRGB(220, 90, 255)),
-				ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 200, 80)),
-			})
-		}, s)
-	end
-end
-
-cornerSwirl(inset, "BL")
-cornerSwirl(inset, "BR")
-
--- Top pill tabs bar
+-- TABS CONTAINER (Верхняя панель)
 local tabsContainer = create("Frame", {
 	Name = "Tabs",
 	BackgroundTransparency = 1,
-	Size = UDim2.new(1, 0, 0, 72),
-	Position = UDim2.fromOffset(0, 12),
-	ZIndex = 20
+	Size = UDim2.new(1, -20, 0, 50),
+	Position = UDim2.new(0, 10, 0, 10),
+	ZIndex = 2
 }, root)
 
 local layout = create("UIListLayout", {
 	FillDirection = Enum.FillDirection.Horizontal,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
-	Padding = UDim.new(0, 12),
-	SortOrder = Enum.SortOrder.LayoutOrder
-}, tabsContainer)
+	Padding = UDim.new(0, 10),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+    Parent = tabsContainer
+})
 
--- Content area
+-- CONTENT CONTAINER (Основная часть)
 local content = create("Frame", {
 	Name = "Content",
 	BackgroundTransparency = 1,
-	Position = UDim2.new(0, 18, 0, 92),
-	Size = UDim2.new(1, -36, 1, -110),
-	ZIndex = 10
+	Position = UDim2.new(0, 10, 0, 70),
+	Size = UDim2.new(1, -20, 1, -80),
+	ZIndex = 2
 }, root)
-
-local contentPanel = create("Frame", {
-	Name = "ContentPanel",
-	BackgroundColor3 = Color3.fromRGB(14, 14, 20),
-	BackgroundTransparency = 0.5, -- Чуть прозрачнее, чтобы видеть фон
-	BorderSizePixel = 0,
-	Size = UDim2.fromScale(1, 1),
-	ZIndex = 10
-}, content)
-create("UICorner", {CornerRadius = UDim.new(0, 22)}, contentPanel)
 
 -- Хранилище страниц
 local Pages = {}
 
 -- Функция создания кнопки-вкладки
-local function createTabBtn(name, colorA, colorB)
-    -- Создаем страницу
+local function createTabBtn(name, color)
+    -- Страница
     local Page = create("ScrollingFrame", {
         Name = name .. "_Page",
-        Parent = contentPanel,
-        Size = UDim2.new(1, -20, 1, -20),
-        Position = UDim2.new(0, 10, 0, 10),
+        Parent = content,
+        Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
         Visible = false,
         ScrollBarThickness = 4,
-        ZIndex = 15
+        ScrollBarImageColor3 = color,
+        ZIndex = 5
     })
     create("UIListLayout", {
         Parent = Page,
         SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 10),
+        Padding = UDim.new(0, 8),
         HorizontalAlignment = Enum.HorizontalAlignment.Center
-    }, Page)
-    create("UIPadding", {Parent = Page, PaddingTop = UDim.new(0, 5)}, Page)
+    })
+    create("UIPadding", {Parent = Page, PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5)})
     
     Pages[name] = Page
 
-    -- Создаем кнопку (TextButton вместо Frame)
+    -- Кнопка
 	local btn = create("TextButton", {
-		Size = UDim2.fromOffset(110, 40), -- Чуть уже, чтобы влез текст
-		BackgroundColor3 = Color3.fromRGB(30, 30, 38),
-		BackgroundTransparency = 0.12,
+        Parent = tabsContainer,
+		Size = UDim2.fromOffset(100, 35),
+		BackgroundColor3 = Color3.fromRGB(30, 30, 40),
 		BorderSizePixel = 0,
-		ZIndex = 21,
+		ZIndex = 10,
         Text = name,
         Font = Enum.Font.GothamBold,
-        TextColor3 = Color3.new(1,1,1),
+        TextColor3 = color, -- Цвет текста = цвет вкладки
         TextSize = 14,
-        AutoButtonColor = false
-	}, tabsContainer)
+        AutoButtonColor = true
+	})
+	create("UICorner", {CornerRadius = UDim.new(0, 8)}, btn)
+    
+    -- Обводка кнопки
+    create("UIStroke", {
+        Parent = btn,
+        Thickness = 2,
+        Color = color,
+        Transparency = 0.5,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    })
 
-	create("UICorner", {CornerRadius = UDim.new(1, 0)}, btn)
-
-	local s = create("UIStroke", {
-		Thickness = 2,
-		Transparency = 0.05,
-		ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	}, btn)
-
-	create("UIGradient", {
-		Rotation = 25,
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, colorA),
-			ColorSequenceKeypoint.new(1, colorB),
-		})
-	}, s)
-
-    -- Логика переключения
     btn.MouseButton1Click:Connect(function()
         for _, p in pairs(Pages) do p.Visible = false end
         Pages[name].Visible = true
-        
-        -- Анимация нажатия
-        TweenService:Create(btn, TweenInfo.new(0.1), {Size = UDim2.fromOffset(100, 35)}):Play()
-        task.wait(0.1)
-        TweenService:Create(btn, TweenInfo.new(0.1), {Size = UDim2.fromOffset(110, 40)}):Play()
     end)
-
-	return btn
 end
 
--- Создаем вкладки
-createTabBtn("Movement", Color3.fromRGB(70, 220, 255), Color3.fromRGB(90, 140, 255))
-createTabBtn("Visuals", Color3.fromRGB(220, 90, 255), Color3.fromRGB(255, 120, 180))
-createTabBtn("Players", Color3.fromRGB(120, 110, 255), Color3.fromRGB(80, 255, 200))
-createTabBtn("Settings", Color3.fromRGB(255, 210, 90), Color3.fromRGB(255, 140, 70))
+createTabBtn("Movement", Color3.fromRGB(0, 255, 255)) -- Cyan
+createTabBtn("Visuals", Color3.fromRGB(255, 0, 255))  -- Magenta
+createTabBtn("Players", Color3.fromRGB(100, 255, 100)) -- Green
+createTabBtn("Settings", Color3.fromRGB(255, 200, 0)) -- Orange
 
--- Открываем первую
 Pages["Movement"].Visible = true
 
--- [[ ФУНКЦИИ ДЛЯ ЭЛЕМЕНТОВ (ВНУТРИ СТРАНИЦ) ]] --
+-- [[ ЭЛЕМЕНТЫ UI ]] --
 
 local function AddElementBox(page)
     local box = create("Frame", {
         Parent = page,
-        Size = UDim2.new(0.95, 0, 0, 45),
+        Size = UDim2.new(0.98, 0, 0, 40),
         BackgroundColor3 = Color3.fromRGB(25, 25, 35),
-        BackgroundTransparency = 0.3,
-        ZIndex = 16
+        BorderSizePixel = 0,
+        ZIndex = 10
     })
-    create("UICorner", {CornerRadius = UDim.new(0, 12)}, box)
-    create("UIStroke", {Thickness = 1, Transparency = 0.8, Color = Color3.new(1,1,1)}, box)
+    create("UICorner", {CornerRadius = UDim.new(0, 6)}, box)
     return box
 end
 
 local function AddToggle(page, text, callback)
     local box = AddElementBox(page)
     
-    local label = create("TextLabel", {
+    create("TextLabel", {
         Parent = box,
         Size = UDim2.new(0.7, 0, 1, 0),
-        Position = UDim2.new(0, 15, 0, 0),
+        Position = UDim2.new(0, 10, 0, 0),
         BackgroundTransparency = 1,
         Text = text,
         TextColor3 = Color3.new(1,1,1),
         Font = Enum.Font.GothamSemibold,
         TextSize = 14,
         TextXAlignment = Enum.TextXAlignment.Left,
-        ZIndex = 17
+        ZIndex = 11
     })
     
     local btn = create("TextButton", {
         Parent = box,
         Size = UDim2.new(0, 40, 0, 20),
-        Position = UDim2.new(1, -55, 0.5, -10),
+        Position = UDim2.new(1, -50, 0.5, -10),
         BackgroundColor3 = Color3.fromRGB(50, 50, 60),
         Text = "",
-        ZIndex = 17
+        ZIndex = 11
     })
     create("UICorner", {CornerRadius = UDim.new(1, 0)}, btn)
     
@@ -322,7 +207,7 @@ local function AddToggle(page, text, callback)
         Size = UDim2.new(0, 16, 0, 16),
         Position = UDim2.new(0, 2, 0.5, -8),
         BackgroundColor3 = Color3.new(1,1,1),
-        ZIndex = 18
+        ZIndex = 12
     })
     create("UICorner", {CornerRadius = UDim.new(1, 0)}, circle)
     
@@ -330,7 +215,7 @@ local function AddToggle(page, text, callback)
     btn.MouseButton1Click:Connect(function()
         state = not state
         if state then
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 255, 150)}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 255, 100)}):Play()
             TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(1, -18, 0.5, -8)}):Play()
         else
             TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}):Play()
@@ -342,37 +227,37 @@ end
 
 local function AddSlider(page, text, min, max, default, callback)
     local box = AddElementBox(page)
-    box.Size = UDim2.new(0.95, 0, 0, 60) -- Чуть выше для слайдера
+    box.Size = UDim2.new(0.98, 0, 0, 50)
     
     local label = create("TextLabel", {
         Parent = box,
-        Size = UDim2.new(1, -30, 0, 20),
-        Position = UDim2.new(0, 15, 0, 5),
+        Size = UDim2.new(1, -20, 0, 20),
+        Position = UDim2.new(0, 10, 0, 5),
         BackgroundTransparency = 1,
         Text = text .. ": " .. default,
         TextColor3 = Color3.new(1,1,1),
         Font = Enum.Font.GothamSemibold,
         TextSize = 14,
         TextXAlignment = Enum.TextXAlignment.Left,
-        ZIndex = 17
+        ZIndex = 11
     })
     
     local sliderBg = create("TextButton", {
         Parent = box,
-        Size = UDim2.new(1, -30, 0, 6),
-        Position = UDim2.new(0, 15, 0, 35),
+        Size = UDim2.new(1, -20, 0, 6),
+        Position = UDim2.new(0, 10, 0, 30),
         BackgroundColor3 = Color3.fromRGB(50, 50, 60),
         Text = "",
         AutoButtonColor = false,
-        ZIndex = 17
+        ZIndex = 11
     })
     create("UICorner", {CornerRadius = UDim.new(1, 0)}, sliderBg)
     
     local fill = create("Frame", {
         Parent = sliderBg,
         Size = UDim2.new((default - min)/(max - min), 0, 1, 0),
-        BackgroundColor3 = Color3.fromRGB(90, 140, 255),
-        ZIndex = 18
+        BackgroundColor3 = Color3.fromRGB(0, 180, 255),
+        ZIndex = 12
     })
     create("UICorner", {CornerRadius = UDim.new(1, 0)}, fill)
     
@@ -409,7 +294,7 @@ local function AddButton(page, text, callback)
         TextColor3 = Color3.new(1,1,1),
         Font = Enum.Font.GothamBold,
         TextSize = 14,
-        ZIndex = 17
+        ZIndex = 11
     })
     
     btn.MouseButton1Click:Connect(function()
@@ -420,115 +305,45 @@ local function AddButton(page, text, callback)
     end)
 end
 
--- [[ НАПОЛНЕНИЕ ФУНКЦИОНАЛОМ ]] --
+-- [[ ФУНКЦИОНАЛ ]] --
 
--- Глобальное состояние
-local State = {
-    FlyEnabled = false,
-    InfJumpEnabled = false,
-    EspEnabled = false,
-    DrawingObjects = {}
-}
-
--- 1. MOVEMENT
+-- Movement
 local MovePage = Pages["Movement"]
-
 AddSlider(MovePage, "Walk Speed", 16, 300, 16, function(val)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         LocalPlayer.Character.Humanoid.WalkSpeed = val
     end
 end)
-
 AddSlider(MovePage, "Jump Power", 50, 500, 50, function(val)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         LocalPlayer.Character.Humanoid.UseJumpPower = true
         LocalPlayer.Character.Humanoid.JumpPower = val
     end
 end)
-
-AddToggle(MovePage, "Infinite Jump", function(val) State.InfJumpEnabled = val end)
-
+AddToggle(MovePage, "Infinite Jump", function(val) getgenv().InfJump = val end)
 UserInputService.JumpRequest:Connect(function()
-    if State.InfJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+    if getgenv().InfJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
-local FlySpeed = 50
-AddSlider(MovePage, "Fly Speed", 10, 300, 50, function(val) FlySpeed = val end)
-
-AddToggle(MovePage, "Fly (WASD)", function(val)
-    State.FlyEnabled = val
-    local char = LocalPlayer.Character
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    
-    if val and root then
-        local bv = Instance.new("BodyVelocity", root)
-        bv.Name = "ZlinFlyV"; bv.MaxForce = Vector3.new(1e9,1e9,1e9)
-        local bg = Instance.new("BodyGyro", root)
-        bg.Name = "ZlinFlyG"; bg.MaxTorque = Vector3.new(1e9,1e9,1e9); bg.P = 10000; bg.D = 1000
-        
-        task.spawn(function()
-            while State.FlyEnabled and char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 do
-                local cam = workspace.CurrentCamera
-                local moveDir = Vector3.new()
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
-                bg.CFrame = cam.CFrame
-                bv.Velocity = moveDir * FlySpeed
-                task.wait()
-            end
-            if bv then bv:Destroy() end
-            if bg then bg:Destroy() end
-        end)
-    else
-        for _, v in pairs(root:GetChildren()) do
-            if v.Name == "ZlinFlyV" or v.Name == "ZlinFlyG" then v:Destroy() end
-        end
-    end
-end)
-
--- 2. VISUALS
+-- Visuals
 local VisPage = Pages["Visuals"]
-
-AddToggle(VisPage, "Enable ESP (Names)", function(val)
-    State.EspEnabled = val
-    if not val then
-        for _, p in pairs(Players:GetPlayers()) do
-            if p.Character and p.Character:FindFirstChild("Head") and p.Character.Head:FindFirstChild("ZlinESP") then
-                p.Character.Head.ZlinESP:Destroy()
-            end
-        end
-    end
-end)
-
+AddToggle(VisPage, "ESP Enabled", function(val) getgenv().Esp = val end)
 task.spawn(function()
     while true do
-        if State.EspEnabled then
+        if getgenv().Esp then
             for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-                    if not p.Character.Head:FindFirstChild("ZlinESP") then
-                        local bg = Instance.new("BillboardGui")
-                        bg.Name = "ZlinESP"
-                        bg.Adornee = p.Character.Head
-                        bg.Size = UDim2.new(0, 100, 0, 50)
-                        bg.StudsOffset = Vector3.new(0, 2, 0)
-                        bg.AlwaysOnTop = true
-                        bg.Parent = p.Character.Head
-                        
-                        local txt = create("TextLabel", {
-                            Parent = bg,
-                            Size = UDim2.new(1,0,1,0),
-                            BackgroundTransparency = 1,
-                            Text = p.Name,
-                            TextColor3 = Color3.new(1,0,0),
-                            TextStrokeTransparency = 0,
-                            Font = Enum.Font.GothamBold
-                        })
-                    end
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and not p.Character.Head:FindFirstChild("ZlinESP") then
+                    local bg = Instance.new("BillboardGui", p.Character.Head)
+                    bg.Name = "ZlinESP"; bg.Size = UDim2.new(0,100,0,50); bg.AlwaysOnTop = true; bg.StudsOffset = Vector3.new(0,2,0)
+                    local t = Instance.new("TextLabel", bg); t.Size = UDim2.new(1,0,1,0); t.BackgroundTransparency = 1; t.Text = p.Name; t.TextColor3 = Color3.new(1,0,0); t.TextStrokeTransparency = 0
+                end
+            end
+        else
+            for _, p in pairs(Players:GetPlayers()) do
+                if p.Character and p.Character:FindFirstChild("Head") and p.Character.Head:FindFirstChild("ZlinESP") then
+                    p.Character.Head.ZlinESP:Destroy()
                 end
             end
         end
@@ -536,106 +351,31 @@ task.spawn(function()
     end
 end)
 
--- 3. PLAYERS
+-- Players
 local PlayPage = Pages["Players"]
-
 local PlayerInput = create("TextBox", {
-    Parent = PlayPage,
-    Size = UDim2.new(0.95, 0, 0, 40),
-    BackgroundColor3 = Color3.fromRGB(25, 25, 35),
-    Text = "Type Player Name...",
-    TextColor3 = Color3.new(1,1,1),
-    Font = Enum.Font.Gotham,
-    TextSize = 16,
-    ZIndex = 16
+    Parent = PlayPage, Size = UDim2.new(0.98, 0, 0, 40), BackgroundColor3 = Color3.fromRGB(25, 25, 35),
+    Text = "Player Name...", TextColor3 = Color3.new(1,1,1), Font = Enum.Font.Gotham, TextSize = 16, ZIndex = 10
 })
-create("UICorner", {CornerRadius = UDim.new(0, 10)}, PlayerInput)
-
-AddButton(PlayPage, "Teleport to Player", function()
-    local targetName = PlayerInput.Text
+create("UICorner", {CornerRadius = UDim.new(0, 6)}, PlayerInput)
+AddButton(PlayPage, "Teleport", function()
+    local target = PlayerInput.Text
     for _, p in pairs(Players:GetPlayers()) do
-        if string.sub(p.Name:lower(), 1, #targetName) == targetName:lower() then
+        if string.sub(p.Name:lower(), 1, #target) == target:lower() then
             if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+                LocalPlayer.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame + Vector3.new(0,3,0)
             end
         end
     end
 end)
 
-AddButton(PlayPage, "Anti-Lag (Remove Textures)", function()
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v:IsA("BasePart") and not v:IsA("MeshPart") then
-            v.Material = Enum.Material.SmoothPlastic
-            v.Reflectance = 0
-        elseif v:IsA("Decal") or v:IsA("Texture") then
-            v:Destroy()
-        end
-    end
-end)
-
--- 4. SETTINGS
+-- Settings
 local SetPage = Pages["Settings"]
 AddButton(SetPage, "Unload Script", function() gui:Destroy() end)
-AddButton(SetPage, "Rejoin Server", function() game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer) end)
 
--- Bottom mini pills row (Actions)
-local bottom = create("Frame", {
-	Name = "BottomPills",
-	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 1, -16),
-	Size = UDim2.new(1, -90, 0, 44),
-	ZIndex = 20
-}, root)
-
-create("UIListLayout", {
-	FillDirection = Enum.FillDirection.Horizontal,
-	HorizontalAlignment = Enum.HorizontalAlignment.Center,
-	VerticalAlignment = Enum.VerticalAlignment.Center,
-	Padding = UDim.new(0, 10),
-	SortOrder = Enum.SortOrder.LayoutOrder
-}, bottom)
-
-local function createMiniBtn(text, col, func)
-	local p = create("TextButton", {
-		Size = UDim2.fromOffset(80, 26),
-		BackgroundColor3 = Color3.fromRGB(30, 30, 38),
-		BackgroundTransparency = 0.15,
-		BorderSizePixel = 0,
-		ZIndex = 21,
-        Text = text,
-        TextColor3 = Color3.new(1,1,1),
-        Font = Enum.Font.GothamBold,
-        TextSize = 12
-	}, bottom)
-	create("UICorner", {CornerRadius = UDim.new(1, 0)}, p)
-	local ps = create("UIStroke", {Thickness = 2, Transparency = 0.15}, p)
-	create("UIGradient", {
-		Rotation = 25,
-		Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, col),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
-		}),
-		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.05),
-			NumberSequenceKeypoint.new(1, 0.55),
-		})
-	}, ps)
-    p.MouseButton1Click:Connect(func)
-end
-
-createMiniBtn("Hide", Color3.fromRGB(80, 255, 200), function() gui.Enabled = false end)
-createMiniBtn("Unload", Color3.fromRGB(255, 80, 80), function() gui:Destroy() end)
-
--- Right Ctrl Toggle
+-- Right Ctrl
 UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.RightControl then
-        gui.Enabled = not gui.Enabled
-    end
+    if input.KeyCode == Enum.KeyCode.RightControl then gui.Enabled = not gui.Enabled end
 end)
 
-game.StarterGui:SetCore("SendNotification", {
-    Title = "ZlinHUB Cosmic";
-    Text = "Loaded! Press Right Ctrl to toggle.";
-    Duration = 5;
-})
+game.StarterGui:SetCore("SendNotification", {Title = "ZlinHUB", Text = "Loaded! Press Right Ctrl", Duration = 5})
